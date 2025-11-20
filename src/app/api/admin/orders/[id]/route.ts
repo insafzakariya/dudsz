@@ -47,7 +47,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { status, trackingCode, packageImage, note } = body;
+    const { status, trackingCode, packageImage, note, cancellationReason } = body;
 
     if (!status) {
       return NextResponse.json(
@@ -101,6 +101,9 @@ export async function PATCH(
       if (trackingCode) {
         description += ` (Tracking: ${trackingCode})`;
       }
+      if (cancellationReason && status === 'CANCELLED') {
+        description += ` - Reason: ${cancellationReason}`;
+      }
 
       const activityMetadata: any = {
         oldStatus: currentOrder.status,
@@ -118,6 +121,10 @@ export async function PATCH(
       if (note) {
         activityMetadata.note = note;
         description += ` - Note: ${note}`;
+      }
+
+      if (cancellationReason) {
+        activityMetadata.cancellationReason = cancellationReason;
       }
 
       // Log status change activity

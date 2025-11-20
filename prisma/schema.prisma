@@ -202,6 +202,17 @@ model OrderActivity {
   @@map("order_activities")
 }
 
+model CancellationReason {
+  id          String   @id @default(cuid())
+  reason      String   @unique
+  enabled     Boolean  @default(true)
+  displayOrder Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("cancellation_reasons")
+}
+
 model City {
   id            String   @id @default(cuid())
   name          String   @unique

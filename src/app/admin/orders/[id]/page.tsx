@@ -94,10 +94,27 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
   const [packageImagePreview, setPackageImagePreview] = useState<string>('');
   const [ongoingNote, setOngoingNote] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showDeliveredDialog, setShowDeliveredDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancellationReasons, setCancellationReasons] = useState<any[]>([]);
+  const [selectedCancellationReason, setSelectedCancellationReason] = useState('');
 
   useEffect(() => {
     fetchOrder();
+    fetchCancellationReasons();
   }, [params.id]);
+
+  const fetchCancellationReasons = async () => {
+    try {
+      const response = await fetch('/api/admin/cancellation-reasons');
+      if (response.ok) {
+        const data = await response.json();
+        setCancellationReasons(data);
+      }
+    } catch (error) {
+      console.error('Error fetching cancellation reasons:', error);
+    }
+  };
 
   const fetchOrder = async () => {
     setIsLoading(true);
@@ -213,6 +230,79 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
     } finally {
       setIsUpdating(false);
       setIsUploadingImage(false);
+    }
+  };
+
+  const handleMarkAsDelivered = async () => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/admin/orders/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DELIVERED' }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Order marked as delivered',
+        });
+        setShowDeliveredDialog(false);
+        fetchOrder();
+      } else {
+        throw new Error('Failed to update status');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update order status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!selectedCancellationReason) {
+      toast({
+        title: 'Error',
+        description: 'Please select a cancellation reason',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/admin/orders/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          cancellationReason: selectedCancellationReason,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Order cancelled successfully',
+        });
+        setShowCancelDialog(false);
+        setSelectedCancellationReason('');
+        fetchOrder();
+      } else {
+        throw new Error('Failed to cancel order');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to cancel order',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -1106,7 +1196,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                   </Button>
                   <Button
                     className="w-full bg-red-500 hover:bg-red-600"
-                    onClick={() => updateOrderStatus('CANCELLED')}
+                    onClick={() => setShowCancelDialog(true)}
                     disabled={isUpdating}
                   >
                     <XCircle className="h-4 w-4 mr-2" />
@@ -1118,7 +1208,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                 <>
                   <Button
                     className="w-full bg-green-500 hover:bg-green-600"
-                    onClick={() => updateOrderStatus('DELIVERED')}
+                    onClick={() => setShowDeliveredDialog(true)}
                     disabled={isUpdating}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
@@ -1126,7 +1216,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                   </Button>
                   <Button
                     className="w-full bg-red-500 hover:bg-red-600"
-                    onClick={() => updateOrderStatus('CANCELLED')}
+                    onClick={() => setShowCancelDialog(true)}
                     disabled={isUpdating}
                   >
                     <XCircle className="h-4 w-4 mr-2" />
@@ -1318,6 +1408,149 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                 <span className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
                   Confirm & Mark as Ongoing
+                </span>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark as Delivered Dialog */}
+      <Dialog open={showDeliveredDialog} onOpenChange={setShowDeliveredDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+              Mark Order as Delivered
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark this order as delivered?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900 mb-1">
+                    Order #{order.orderNumber}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    This action will mark the order as successfully delivered to the customer.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeliveredDialog(false)}
+              className="flex-1"
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMarkAsDelivered}
+              className="flex-1 bg-green-500 hover:bg-green-600"
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Updating...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Confirm Delivered
+                </span>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Order Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <XCircle className="h-6 w-6 text-red-600" />
+              Cancel Order
+            </DialogTitle>
+            <DialogDescription>
+              Please select a reason for cancelling this order
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancellationReason" className="text-sm font-semibold">
+                Cancellation Reason <span className="text-red-500">*</span>
+              </Label>
+              <select
+                id="cancellationReason"
+                value={selectedCancellationReason}
+                onChange={(e) => setSelectedCancellationReason(e.target.value)}
+                className="w-full h-11 px-4 border-2 border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors bg-white"
+                required
+              >
+                <option value="">Select a reason...</option>
+                {cancellationReasons.map((reason) => (
+                  <option key={reason.id} value={reason.reason}>
+                    {reason.reason}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedCancellationReason && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900 mb-1">
+                      Order #{order.orderNumber}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      This order will be cancelled with reason: <span className="font-semibold">{selectedCancellationReason}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCancelDialog(false);
+                setSelectedCancellationReason('');
+              }}
+              className="flex-1"
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCancelOrder}
+              className="flex-1 bg-red-500 hover:bg-red-600"
+              disabled={isUpdating || !selectedCancellationReason}
+            >
+              {isUpdating ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Cancelling...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  Confirm Cancellation
                 </span>
               )}
             </Button>

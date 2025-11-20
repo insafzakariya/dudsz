@@ -74,6 +74,31 @@ async function main() {
   }
   console.log(`✓ ${cities.length} cities seeded`);
 
+  // Seed Cancellation Reasons
+  const cancellationReasons = [
+    { reason: 'Customer requested cancellation', displayOrder: 1 },
+    { reason: 'Product out of stock', displayOrder: 2 },
+    { reason: 'Delivery address issues', displayOrder: 3 },
+    { reason: 'Payment failed', displayOrder: 4 },
+    { reason: 'Duplicate order', displayOrder: 5 },
+    { reason: 'Customer not reachable', displayOrder: 6 },
+    { reason: 'Pricing error', displayOrder: 7 },
+    { reason: 'Shipping delay', displayOrder: 8 },
+    { reason: 'Customer changed mind', displayOrder: 9 },
+    { reason: 'Wrong item ordered', displayOrder: 10 },
+    { reason: 'Fraudulent order', displayOrder: 11 },
+    { reason: 'Other', displayOrder: 12 },
+  ];
+
+  for (const cancellationReason of cancellationReasons) {
+    await prisma.cancellationReason.upsert({
+      where: { reason: cancellationReason.reason },
+      update: {},
+      create: cancellationReason,
+    });
+  }
+  console.log(`✓ ${cancellationReasons.length} cancellation reasons seeded`);
+
   // Create Categories
   const shortSleeveCategory = await prisma.category.upsert({
     where: { slug: 'short-sleeve' },
