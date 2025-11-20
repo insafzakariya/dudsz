@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { formatPrice } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -17,6 +21,8 @@ import {
   Clock,
   XCircle,
   User,
+  Upload,
+  FileImage,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/use-toast';
@@ -79,6 +85,12 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recentlyAddedItemIds, setRecentlyAddedItemIds] = useState<string[]>([]);
+  const [showOngoingDialog, setShowOngoingDialog] = useState(false);
+  const [trackingCode, setTrackingCode] = useState('');
+  const [packageImage, setPackageImage] = useState<File | null>(null);
+  const [packageImagePreview, setPackageImagePreview] = useState<string>('');
+  const [ongoingNote, setOngoingNote] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -120,6 +132,84 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPackageImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPackageImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadPackageImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const data = await response.json();
+    return data.url;
+  };
+
+  const handleMarkAsOngoing = async () => {
+    setIsUpdating(true);
+    setIsUploadingImage(true);
+
+    try {
+      let imageUrl = '';
+
+      // Upload image if provided
+      if (packageImage) {
+        imageUrl = await uploadPackageImage(packageImage);
+      }
+
+      const response = await fetch(`/api/admin/orders/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'ONGOING',
+          trackingCode: trackingCode || null,
+          packageImage: imageUrl || null,
+          note: ongoingNote || null,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Order marked as ongoing',
+        });
+        setShowOngoingDialog(false);
+        setTrackingCode('');
+        setPackageImage(null);
+        setPackageImagePreview('');
+        setOngoingNote('');
+        fetchOrder();
+      } else {
+        throw new Error('Failed to update status');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update order status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+      setIsUploadingImage(false);
     }
   };
 
@@ -918,7 +1008,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                 <>
                   <Button
                     className="w-full bg-orange-500 hover:bg-orange-600"
-                    onClick={() => updateOrderStatus('ONGOING')}
+                    onClick={() => setShowOngoingDialog(true)}
                     disabled={isUpdating}
                   >
                     <Package className="h-4 w-4 mr-2" />
@@ -1008,6 +1098,142 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
           )}
         </div>
       </div>
+
+      {/* Mark as Ongoing Dialog */}
+      <Dialog open={showOngoingDialog} onOpenChange={setShowOngoingDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <Package className="h-6 w-6 text-orange-600" />
+              Mark Order as Ongoing
+            </DialogTitle>
+            <DialogDescription>
+              Add tracking information and package details (all fields are optional)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Tracking Code */}
+            <div className="space-y-2">
+              <Label htmlFor="trackingCode" className="text-sm font-semibold flex items-center gap-2">
+                <Truck className="h-4 w-4 text-gray-500" />
+                Tracking Code
+                <span className="text-xs text-gray-500 font-normal">(Optional)</span>
+              </Label>
+              <Input
+                id="trackingCode"
+                type="text"
+                value={trackingCode}
+                onChange={(e) => setTrackingCode(e.target.value)}
+                placeholder="Enter tracking code"
+                className="h-11 border-2"
+              />
+            </div>
+
+            {/* Package Image Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="packageImage" className="text-sm font-semibold flex items-center gap-2">
+                <FileImage className="h-4 w-4 text-gray-500" />
+                Package Image
+                <span className="text-xs text-gray-500 font-normal">(Optional)</span>
+              </Label>
+              <div className="border-2 border-dashed rounded-lg p-4 hover:border-orange-400 transition-colors">
+                <input
+                  id="packageImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="packageImage"
+                  className="flex flex-col items-center justify-center cursor-pointer"
+                >
+                  {packageImagePreview ? (
+                    <div className="relative w-full">
+                      <img
+                        src={packageImagePreview}
+                        alt="Package preview"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPackageImage(null);
+                          setPackageImagePreview('');
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-gray-500">
+                      <Upload className="h-10 w-10" />
+                      <p className="text-sm font-medium">Click to upload package image</p>
+                      <p className="text-xs text-gray-400">PNG, JPG up to 10MB</p>
+                    </div>
+                  )}
+                </label>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-2">
+              <Label htmlFor="ongoingNote" className="text-sm font-semibold flex items-center gap-2">
+                <Mail className="h-4 w-4 text-gray-500" />
+                Note
+                <span className="text-xs text-gray-500 font-normal">(Optional)</span>
+              </Label>
+              <Textarea
+                id="ongoingNote"
+                value={ongoingNote}
+                onChange={(e) => setOngoingNote(e.target.value)}
+                placeholder="Add any additional notes..."
+                rows={4}
+                className="border-2 resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowOngoingDialog(false);
+                setTrackingCode('');
+                setPackageImage(null);
+                setPackageImagePreview('');
+                setOngoingNote('');
+              }}
+              className="flex-1"
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMarkAsOngoing}
+              className="flex-1 bg-orange-500 hover:bg-orange-600"
+              disabled={isUpdating || isUploadingImage}
+            >
+              {isUpdating ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  {isUploadingImage ? 'Uploading...' : 'Updating...'}
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Confirm & Mark as Ongoing
+                </span>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

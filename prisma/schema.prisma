@@ -149,6 +149,9 @@ model Order {
   // Workflow
   packingPhotoUrl String?
   notes           String?
+  trackingCode    String?
+  packageImage    String?
+  customerEmail   String?
 
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt

@@ -47,7 +47,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { status } = body;
+    const { status, trackingCode, packageImage, note } = body;
 
     if (!status) {
       return NextResponse.json(
@@ -81,7 +81,11 @@ export async function PATCH(
     const order = await db.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
         where: { id: params.id },
-        data: { status },
+        data: {
+          status,
+          trackingCode: trackingCode || currentOrder.trackingCode,
+          packageImage: packageImage || currentOrder.packageImage,
+        },
         include: {
           city: true,
           items: {
@@ -92,16 +96,37 @@ export async function PATCH(
         },
       });
 
+      // Build activity description
+      let description = `Order status changed from ${currentOrder.status} to ${status}`;
+      if (trackingCode) {
+        description += ` (Tracking: ${trackingCode})`;
+      }
+
+      const activityMetadata: any = {
+        oldStatus: currentOrder.status,
+        newStatus: status,
+      };
+
+      if (trackingCode) {
+        activityMetadata.trackingCode = trackingCode;
+      }
+
+      if (packageImage) {
+        activityMetadata.packageImage = packageImage;
+      }
+
+      if (note) {
+        activityMetadata.note = note;
+        description += ` - Note: ${note}`;
+      }
+
       // Log status change activity
       await tx.orderActivity.create({
         data: {
           orderId: params.id,
           action: 'STATUS_CHANGED',
-          description: `Order status changed from ${currentOrder.status} to ${status}`,
-          metadata: {
-            oldStatus: currentOrder.status,
-            newStatus: status,
-          },
+          description,
+          metadata: activityMetadata,
           createdBy: 'ADMIN',
         },
       });
