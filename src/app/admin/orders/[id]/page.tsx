@@ -39,6 +39,8 @@ interface Order {
   shippingCost: number;
   discount: number;
   status: string;
+  trackingCode: string | null;
+  packageImage: string | null;
   createdAt: string;
   updatedAt: string;
   items: {
@@ -67,6 +69,7 @@ interface Order {
     description: string;
     createdAt: string;
     createdBy: string | null;
+    metadata?: any;
   }[];
 }
 
@@ -916,6 +919,93 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
               </div>
             </CardContent>
           </Card>
+
+          {/* Tracking & Shipment Details - Only show if order is ONGOING or DELIVERED and has tracking info */}
+          {(order.status === 'ONGOING' || order.status === 'DELIVERED') && (order.trackingCode || order.packageImage) && (
+            <Card>
+              <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50">
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5 text-orange-600" />
+                  Tracking & Shipment Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                {/* Tracking Code */}
+                {order.trackingCode && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border-2 border-blue-200">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Truck className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-700 mb-1">Tracking Code</p>
+                        <p className="text-2xl font-bold text-blue-600 tracking-wider">{order.trackingCode}</p>
+                        <p className="text-xs text-gray-500 mt-1">Use this code to track your shipment</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Package Image */}
+                {order.packageImage && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileImage className="h-5 w-5 text-gray-600" />
+                      <p className="text-sm font-semibold text-gray-700">Package Photo</p>
+                    </div>
+                    <div className="relative rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+                      <img
+                        src={order.packageImage}
+                        alt="Package"
+                        className="w-full h-auto max-h-96 object-contain bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes from Activity */}
+                {order.activities && order.activities.length > 0 && (() => {
+                  const ongoingActivity = order.activities.find(
+                    (activity: any) => activity.action === 'STATUS_CHANGED' && activity.metadata?.note
+                  );
+                  if (ongoingActivity?.metadata?.note) {
+                    return (
+                      <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200">
+                        <div className="flex items-start gap-3">
+                          <Mail className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-700 mb-2">Admin Note</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{ongoingActivity.metadata.note}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Shipment Status */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 bg-orange-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium text-gray-700">
+                        {order.status === 'DELIVERED' ? 'Delivered' : 'In Transit'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      Updated {new Date(order.updatedAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
