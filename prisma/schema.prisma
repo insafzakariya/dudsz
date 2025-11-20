@@ -1,0 +1,296 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ONGOING
+  DELIVERED
+  CANCELLED
+}
+
+enum SleeveType {
+  LONG_SLEEVE
+  SHORT_SLEEVE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          UserRole  @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders        Order[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  sleeveType  SleeveType
+  slug        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  code        String    @unique // 4-digit code
+  name        String
+  description String?
+  price       Float
+  stock       Int       @default(0)
+  weight      Float     @default(200) // Default 200g
+  images      String[]  // Array of image URLs
+  enabled     Boolean   @default(false)
+  featured    Boolean   @default(false)
+  hasVariants Boolean   @default(false) // Enable/disable variants for this product
+
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+
+  sizes       String[]  @default(["S", "M", "L", "XL", "XXL"])
+  colors      String[]  @default([])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  offerProducts   OfferProduct[]
+  orderItems      OrderItem[]
+  productVariants ProductVariant[]
+
+  @@map("products")
+}
+
+model Offer {
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  description     String?
+  logic           String    // e.g., "Buy 4 for 2000"
+  quantity        Int       // e.g., 4
+  price           Float     // e.g., 2000
+  enabled         Boolean   @default(false)
+  featured        Boolean   @default(false)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  offerProducts   OfferProduct[]
+
+  @@map("offers")
+}
+
+model OfferProduct {
+  id        String   @id @default(cuid())
+  offerId   String
+  productId String
+
+  // Selected variant option IDs for this offer
+  // Empty array means all variants are included
+  selectedVariantOptionIds String[] @default([])
+
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([offerId, productId])
+  @@map("offer_products")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  status          OrderStatus @default(PENDING)
+
+  // Customer Information
+  customerName    String
+  customerMobile  String
+  customerAddress String
+  cityId          String
+  city            City        @relation(fields: [cityId], references: [id])
+
+  // User (optional - for logged in users)
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+
+  // Pricing
+  subtotal        Float
+  shippingCost    Float
+  discount        Float       @default(0)
+  total           Float
+
+  // Workflow
+  packingPhotoUrl String?
+  notes           String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deliveredAt     DateTime?
+
+  items           OrderItem[]
+  activities      OrderActivity[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id])
+
+  quantity    Int
+  size        String?
+  color       String?
+  price       Float   // Price at time of order
+
+  // Bundle information
+  bundleId       String? // Unique bundle identifier
+  bundleName     String? // e.g., "Buy 4 for 2000"
+  bundlePrice    Float?  // The bundle price if part of an offer
+  bundleQuantity Int?    // Required quantity for the offer
+
+  createdAt   DateTime @default(now())
+
+  @@map("order_items")
+}
+
+model OrderActivity {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  action      String   // e.g., "ITEM_REMOVED", "STATUS_CHANGED", "ORDER_CREATED"
+  description String   // Human-readable description
+  metadata    Json?    // Additional data (removed item details, old/new status, etc.)
+
+  createdBy   String?  // Admin user ID or "SYSTEM"
+  createdAt   DateTime @default(now())
+
+  @@map("order_activities")
+}
+
+model City {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  district      String?
+  shippingCost  Float    @default(0)
+  enabled       Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders        Order[]
+
+  @@map("cities")
+}
+
+model SiteConfig {
+  id                String   @id @default("site_config")
+
+  // Branding Colors
+  primaryColor      String   @default("#2596be")
+  secondaryColor    String   @default("#0b1120")
+  accentColor       String   @default("#ffffff")
+  buttonColor       String   @default("#2596be")
+  textColor         String   @default("#000000")
+
+  // Shipping Configuration
+  baseShippingRate  Float    @default(300)  // Base rate per KG
+  freeShippingMin   Float?   // Minimum order for free shipping
+
+  // Discount Configuration
+  discountEnabled   Boolean  @default(false)
+  discountPercent   Float    @default(0)
+
+  // Site Information
+  siteName          String   @default("DUDSZ.lk")
+  siteDescription   String?
+  contactEmail      String?
+  contactPhone      String?
+
+  // Social Media
+  facebookUrl       String?
+  whatsappNumber    String?
+  instagramUrl      String?
+
+  updatedAt         DateTime @updatedAt
+
+  @@map("site_config")
+}
+
+model VariantType {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g., "Size", "Color", "Model"
+  enabled   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  options   VariantOption[]
+
+  @@map("variant_types")
+}
+
+model VariantOption {
+  id            String   @id @default(cuid())
+  name          String   // e.g., "S", "M", "L", "XL", "XXL"
+  variantTypeId String
+  variantType   VariantType @relation(fields: [variantTypeId], references: [id], onDelete: Cascade)
+  enabled       Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  productVariants ProductVariant[]
+
+  @@unique([variantTypeId, name])
+  @@map("variant_options")
+}
+
+model ProductVariant {
+  id              String   @id @default(cuid())
+  productId       String
+  variantOptionId String
+
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantOption   VariantOption @relation(fields: [variantOptionId], references: [id], onDelete: Cascade)
+
+  stock           Int      @default(0)
+  priceAdjustment Float    @default(0) // Price difference from base product price
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([productId, variantOptionId])
+  @@map("product_variants")
+}
