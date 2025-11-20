@@ -7,8 +7,22 @@ import { ProductTable } from '@/components/admin/product-table';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProductsPage() {
-  const products = await getProducts();
+interface ProductsPageProps {
+  searchParams: {
+    page?: string;
+    search?: string;
+  };
+}
+
+export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+  const page = parseInt(searchParams.page || '1', 10);
+  const search = searchParams.search || '';
+
+  const { products, pagination } = await getProducts({
+    page,
+    limit: 20,
+    search,
+  });
 
   return (
     <div>
@@ -26,7 +40,7 @@ export default async function ProductsPage() {
       </div>
 
       <Card className="p-6">
-        <ProductTable products={products} />
+        <ProductTable products={products} pagination={pagination} />
       </Card>
     </div>
   );

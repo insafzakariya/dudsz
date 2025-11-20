@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Pencil, Trash2, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { updateProduct, deleteProduct } from '@/lib/actions/products';
@@ -21,14 +21,51 @@ interface Product {
   category: { name: string } | null;
 }
 
-interface ProductTableProps {
-  products: Product[];
+interface Pagination {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
 }
 
-export function ProductTable({ products }: ProductTableProps) {
+interface ProductTableProps {
+  products: Product[];
+  pagination: Pagination;
+}
+
+export function ProductTable({ products, pagination }: ProductTableProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchQuery.trim()) {
+      params.set('search', searchQuery);
+      params.set('page', '1'); // Reset to first page on new search
+    } else {
+      params.delete('search');
+      params.delete('page');
+    }
+    router.push(`/admin/products?${params.toString()}`);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('search');
+    params.delete('page');
+    router.push(`/admin/products?${params.toString()}`);
+  };
+
+  const goToPage = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', page.toString());
+    router.push(`/admin/products?${params.toString()}`);
+  };
 
   const toggleEnabled = async (productId: string, currentState: boolean) => {
     setLoading(productId);
@@ -72,20 +109,57 @@ export function ProductTable({ products }: ProductTableProps) {
     setLoading(null);
   };
 
-  if (products.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">No products found</p>
-        <Button onClick={() => router.push('/admin/products/bulk-upload')}>
-          Upload Products
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
+    <div>
+      {/* Search Bar */}
+      <div className="mb-6">
+        <form onSubmit={handleSearch} className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name, code, or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-10 py-2 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </form>
+        {pagination.totalCount > 0 && (
+          <p className="text-sm text-gray-500 mt-2">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+            {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of{' '}
+            {pagination.totalCount} product{pagination.totalCount !== 1 ? 's' : ''}
+          </p>
+        )}
+      </div>
+
+      {products.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500 mb-4">
+            {searchParams.get('search') ? 'No products match your search' : 'No products found'}
+          </p>
+          {searchParams.get('search') ? (
+            <Button variant="outline" onClick={clearSearch}>
+              Clear Search
+            </Button>
+          ) : (
+            <Button onClick={() => router.push('/admin/products/bulk-upload')}>
+              Upload Products
+            </Button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
         <thead>
           <tr className="border-b">
             <th className="text-left py-3 px-4">Image</th>
@@ -169,6 +243,67 @@ export function ProductTable({ products }: ProductTableProps) {
           ))}
         </tbody>
       </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {pagination.totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {pagination.page} of {pagination.totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (pagination.totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.page >= pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + i;
+                    } else {
+                      pageNum = pagination.page - 2 + i;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pagination.page === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => goToPage(pageNum)}
+                        className="min-w-[40px]"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

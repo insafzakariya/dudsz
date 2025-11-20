@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatPrice } from '@/lib/utils';
-import { Package, Clock, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Eye, Search, X, User, Phone, Mail, Hash } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 interface Order {
   id: string;
@@ -44,13 +45,74 @@ interface Order {
 type OrderStatus = 'PENDING' | 'ONGOING' | 'DELIVERED' | 'CANCELLED';
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<OrderStatus>('PENDING');
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Order[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Search functionality
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (query.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    // Debounce search
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(`/api/admin/orders/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        setSearchResults(data);
+        setShowSearchResults(true);
+      } catch (error) {
+        console.error('Error searching orders:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectOrder = (orderId: string) => {
+    setShowSearchResults(false);
+    setSearchQuery('');
+    router.push(`/admin/orders/${orderId}`);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -84,8 +146,105 @@ export default function OrdersPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Orders</h1>
-        <p className="text-gray-600">Manage customer orders</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Orders</h1>
+            <p className="text-gray-600">Manage customer orders</p>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative w-[600px]" ref={searchRef}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by order #, name, mobile, email..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-10 pr-10 py-2 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Autocomplete Dropdown */}
+            {showSearchResults && (
+              <div className="absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                {isSearching ? (
+                  <div className="p-4 text-center text-gray-500">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    No orders found
+                  </div>
+                ) : (
+                  <div className="py-2">
+                    {searchResults.map((order) => (
+                      <button
+                        key={order.id}
+                        onClick={() => handleSelectOrder(order.id)}
+                        className="w-full px-4 py-3 hover:bg-gray-50 text-left transition-colors border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Hash className="h-4 w-4 text-blue-600" />
+                              <span className="font-mono text-sm font-semibold text-blue-600">
+                                {order.orderNumber}
+                              </span>
+                              <span
+                                className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  order.status === 'PENDING'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : order.status === 'ONGOING'
+                                    ? 'bg-orange-100 text-orange-800'
+                                    : order.status === 'DELIVERED'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <User className="h-3.5 w-3.5 text-gray-400" />
+                              <span className="text-gray-700 font-medium">{order.customerName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="h-3.5 w-3.5 text-gray-400" />
+                              <span className="text-gray-600">{order.customerMobile}</span>
+                            </div>
+                            {order.customerEmail && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Mail className="h-3.5 w-3.5 text-gray-400" />
+                                <span className="text-gray-600">{order.customerEmail}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="font-semibold text-gray-900">
+                              {formatPrice(order.total)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {order.items.length} item{order.items.length > 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards */}

@@ -89,21 +89,57 @@ export async function deleteProduct(id: string) {
   }
 }
 
-export async function getProducts() {
+export async function getProducts(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
   try {
-    const products = await db.product.findMany({
-      include: {
-        category: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const search = options?.search || '';
+    const skip = (page - 1) * limit;
 
-    return products;
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { code: { contains: search, mode: 'insensitive' as const } },
+            { category: { name: { contains: search, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {};
+
+    const [products, totalCount] = await Promise.all([
+      db.product.findMany({
+        where,
+        include: {
+          category: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+      }),
+      db.product.count({ where }),
+    ]);
+
+    return {
+      products,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    };
   } catch (error) {
     console.error('Error fetching products:', error);
-    return [];
+    return {
+      products: [],
+      pagination: { page: 1, limit: 20, totalCount: 0, totalPages: 0 },
+    };
   }
 }
 
