@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       `;
 
       // Apply watermark
-      buffer = await image
+      const watermarkedBuffer = await image
         .composite([
           {
             input: Buffer.from(svgWatermark),
@@ -72,6 +72,8 @@ export async function POST(request: NextRequest) {
           },
         ])
         .toBuffer();
+
+      buffer = Buffer.from(watermarkedBuffer);
     } catch (imageError) {
       console.error('Error adding watermark:', imageError);
       // If watermarking fails, continue with original image

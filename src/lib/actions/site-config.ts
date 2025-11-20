@@ -46,6 +46,7 @@ export async function getSiteConfig() {
       facebookUrl: null,
       whatsappNumber: null,
       instagramUrl: null,
+      watermarkText: null,
       updatedAt: new Date(),
     };
   }
