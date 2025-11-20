@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemeEditor } from '@/components/admin/theme-editor';
 import { ShippingConfig } from '@/components/admin/shipping-config';
+import { ImageSettings } from '@/components/admin/image-settings';
 import { getSiteConfig } from '@/lib/actions/site-config';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export default async function SettingsPage() {
         <TabsList>
           <TabsTrigger value="theme">Theme & Branding</TabsTrigger>
           <TabsTrigger value="shipping">Shipping</TabsTrigger>
+          <TabsTrigger value="image">Image</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
         </TabsList>
 
@@ -28,6 +30,10 @@ export default async function SettingsPage() {
 
         <TabsContent value="shipping" className="space-y-4">
           <ShippingConfig config={config} />
+        </TabsContent>
+
+        <TabsContent value="image" className="space-y-4">
+          <ImageSettings config={config} />
         </TabsContent>
 
         <TabsContent value="general" className="space-y-4">

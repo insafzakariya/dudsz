@@ -75,8 +75,13 @@ export async function updateProduct(id: string, data: {
 
 export async function deleteProduct(id: string) {
   try {
-    await db.product.delete({
+    // Soft delete: Set deletedAt timestamp instead of actually deleting
+    await db.product.update({
       where: { id },
+      data: {
+        deletedAt: new Date(),
+        enabled: false, // Also disable the product
+      },
     });
 
     revalidatePath('/admin/products');
@@ -102,13 +107,16 @@ export async function getProducts(options?: {
 
     const where = search
       ? {
+          deletedAt: null, // Exclude soft-deleted products
           OR: [
             { name: { contains: search, mode: 'insensitive' as const } },
             { code: { contains: search, mode: 'insensitive' as const } },
             { category: { name: { contains: search, mode: 'insensitive' as const } } },
           ],
         }
-      : {};
+      : {
+          deletedAt: null, // Exclude soft-deleted products
+        };
 
     const [products, totalCount] = await Promise.all([
       db.product.findMany({

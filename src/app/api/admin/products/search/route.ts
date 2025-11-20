@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
           { code: { contains: query, mode: 'insensitive' } },
         ],
         enabled: true,
+        deletedAt: null, // Exclude soft-deleted products
       },
       select: {
         id: true,

@@ -66,6 +66,7 @@ export async function updateSiteConfig(data: {
   whatsappNumber?: string;
   facebookUrl?: string;
   instagramUrl?: string;
+  watermarkText?: string;
 }) {
   try {
     const config = await db.siteConfig.upsert({

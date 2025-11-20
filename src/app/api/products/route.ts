@@ -13,6 +13,9 @@ export async function GET(request: NextRequest) {
     }
 
     const products = await db.product.findMany({
+      where: {
+        deletedAt: null, // Exclude soft-deleted products
+      },
       include: {
         category: true,
         productVariants: {

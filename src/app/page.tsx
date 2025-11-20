@@ -33,6 +33,7 @@ export default async function HomePage() {
   const products = await db.product.findMany({
     where: {
       enabled: true,
+      deletedAt: null, // Exclude soft-deleted products
     },
     include: {
       category: true,

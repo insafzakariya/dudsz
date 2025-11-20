@@ -79,6 +79,7 @@ model Product {
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // Soft delete timestamp
 
   offerProducts   OfferProduct[]
   orderItems      OrderItem[]
@@ -256,6 +257,9 @@ model SiteConfig {
   facebookUrl       String?
   whatsappNumber    String?
   instagramUrl      String?
+
+  // Image Configuration
+  watermarkText     String?  @default("DUDSZ.lk")
 
   updatedAt         DateTime @updatedAt
 

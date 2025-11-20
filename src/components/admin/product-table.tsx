@@ -2,11 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Pencil, Trash2, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, Trash2, Eye, EyeOff, Search, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { updateProduct, deleteProduct } from '@/lib/actions/products';
 import { formatPrice } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Product {
   id: string;
@@ -39,6 +47,8 @@ export function ProductTable({ products, pagination }: ProductTableProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,11 +97,18 @@ export function ProductTable({ products, pagination }: ProductTableProps) {
     setLoading(null);
   };
 
-  const handleDelete = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setShowDeleteDialog(true);
+  };
 
-    setLoading(productId);
-    const result = await deleteProduct(productId);
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+
+    setLoading(productToDelete.id);
+    setShowDeleteDialog(false);
+
+    const result = await deleteProduct(productToDelete.id);
 
     if (result.success) {
       toast({
@@ -107,6 +124,7 @@ export function ProductTable({ products, pagination }: ProductTableProps) {
       });
     }
     setLoading(null);
+    setProductToDelete(null);
   };
 
   return (
@@ -232,7 +250,7 @@ export function ProductTable({ products, pagination }: ProductTableProps) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleDelete(product.id)}
+                    onClick={() => handleDeleteClick(product)}
                     disabled={loading === product.id}
                   >
                     <Trash2 className="h-4 w-4 text-red-600" />
@@ -304,6 +322,79 @@ export function ProductTable({ products, pagination }: ProductTableProps) {
           )}
         </>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <DialogTitle className="text-xl">Delete Product</DialogTitle>
+            </div>
+            <DialogDescription className="text-base pt-2">
+              Are you sure you want to delete this product? It will be hidden from all views.
+            </DialogDescription>
+          </DialogHeader>
+
+          {productToDelete && (
+            <div className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
+              <div className="flex items-start gap-3">
+                {productToDelete.images[0] && (
+                  <img
+                    src={productToDelete.images[0]}
+                    alt={productToDelete.name}
+                    className="w-16 h-16 object-cover rounded border-2 border-gray-300"
+                  />
+                )}
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">{productToDelete.name}</p>
+                  <p className="text-sm text-gray-600 font-mono mt-1">
+                    Code: {productToDelete.code}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Price: {formatPrice(productToDelete.price)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-semibold mb-1">Soft Delete</p>
+                <p>The product will be hidden from all views but preserved in the database for historical order records.</p>
+                <p className="mt-2 text-xs">
+                  The product will be automatically disabled and won't appear in customer-facing pages or admin lists.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              className="flex-1 sm:flex-none"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

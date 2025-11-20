@@ -22,7 +22,7 @@ export async function GET(
       },
     });
 
-    if (!product) {
+    if (!product || product.deletedAt) {
       return NextResponse.json(
         { error: 'Product not found' },
         { status: 404 }
@@ -111,8 +111,13 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await db.product.delete({
+    // Soft delete: Set deletedAt timestamp
+    await db.product.update({
       where: { id: params.id },
+      data: {
+        deletedAt: new Date(),
+        enabled: false,
+      },
     });
 
     return NextResponse.json({ success: true });
