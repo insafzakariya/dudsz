@@ -145,9 +145,10 @@ export default function CheckoutPage() {
         clearCart();
         toast({
           title: 'Order placed successfully!',
-          description: `Your order number is ${data.orderNumber}`,
+          description: `Your order number is ${data.orderNumber}. We'll contact you soon.`,
+          duration: 5000,
         });
-        router.push(`/order-confirmation/${data.orderNumber}`);
+        router.push('/');
       } else {
         const error = await response.json();
         throw new Error(error.error || 'Failed to place order');

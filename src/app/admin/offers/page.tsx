@@ -27,10 +27,12 @@ export default async function OffersPage() {
           <h1 className="text-3xl font-bold mb-2">Offers & Bundles</h1>
           <p className="text-gray-600">Manage your bundle offers</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Offer
-        </Button>
+        <Link href="/admin/offers/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Offer
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -94,10 +96,12 @@ export default async function OffersPage() {
       {offers.length === 0 && (
         <Card className="p-12 text-center">
           <p className="text-gray-500 mb-4">No offers created yet</p>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Your First Offer
-          </Button>
+          <Link href="/admin/offers/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Your First Offer
+            </Button>
+          </Link>
         </Card>
       )}
     </div>
