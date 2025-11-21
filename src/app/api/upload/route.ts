@@ -27,7 +27,6 @@ export async function POST(request: NextRequest) {
     const watermarkText = config.watermarkText || 'DUDSZ.lk';
 
     // Process image with sharp and add watermark
-    
     try {
       const image = sharp(buffer);
       const metadata = await image.metadata();
